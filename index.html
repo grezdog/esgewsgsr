@@ -1,0 +1,696 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Angry Rabbits: Meme Mayhem</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#142033;color:white;font-family:Arial,sans-serif;text-align:center}
+header{padding:10px}
+h1{margin:5px;font-size:clamp(22px,4vw,34px)}
+#info{display:flex;justify-content:center;gap:20px;flex-wrap:wrap;margin:12px;font-weight:bold}
+canvas{display:block;width:min(100%,1000px);height:auto;margin:auto;border:3px solid white;border-radius:9px;touch-action:none}
+button{margin:5px;padding:11px 16px;border:0;border-radius:8px;background:#facc15;color:#111;font-weight:bold;font-size:15px;cursor:pointer}
+button:hover{filter:brightness(1.1)}
+#message{min-height:24px;padding:8px;font-weight:bold}
+small{display:block;color:#dbeafe;padding:0 10px 15px}
+</style>
+</head>
+<body>
+<header>
+<h1>🐰 Angry Rabbits: Meme Mayhem</h1>
+<div id="info">
+<span id="levelLabel">Level 1 / 50</span>
+<span id="tries">Tries: 5 / 5</span>
+<span id="score">Score: 0</span>
+</div>
+</header>
+
+<canvas id="game" width="1000" height="560"></canvas>
+<div>
+<button id="reset">🔄 Restart Level</button>
+<button id="next">➡️ Next Level</button>
+<button id="aimButton">🎯 Aim Guide: ON</button>
+</div>
+<div id="message">Drag the rabbit backward and release to launch!</div>
+<small>50 levels • 5 tries each • Easy aiming • Strong launches • Knock down the towers!</small>
+
+<script>
+(()=>{
+"use strict";
+
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const W=1000,H=560,GROUND=495,GRAVITY=520;
+const sling={x:135,y:GROUND-40};
+
+const themes=[
+["Doge Park","#87d7ff","#fff0b3","VERY WOW"],
+["Among Us Arena","#7968c7","#f6a5b9","SUS RABBITS"],
+["Stonks City","#6fc7a0","#f3e7a5","TO THE MOON"],
+["Galaxy Brain","#34316e","#b9a5ff","BIG BRAIN TIME"],
+["Banana World","#ffe15b","#fff5b0","BANANA MODE"],
+["Pixel Paradise","#43b9c2","#a5f3fc","8-BIT MAYHEM"],
+["Meme Mountain","#80b9ff","#f0f8ff","MAXIMUM MEME"],
+["Cat Internet","#ffb5d7","#fff0f7","MEOW MAYHEM"],
+["Rainbow Road","#bda0ff","#fff1b8","RAINBOW POWER"],
+["Desert Doge","#e8b477","#ffe9b8","MUCH DESERT"],
+["Frog Pond","#70d59b","#d5f7a5","RIBBIT MODE"],
+["Ice Cream Planet","#9ce3ff","#ffe1f0","BRAIN FREEZE"],
+["Space Station","#28345c","#b3dcff","SPACE BUNNY"],
+["Jungle Meme","#42a96e","#d4f59a","JUNGLE CHAOS"],
+["Volcano Valley","#ad5148","#ffd17a","HOT MEMES"],
+["Candy Kingdom","#f4a1d5","#fff0aa","SWEET VICTORY"],
+["Robot Factory","#697e9a","#d9e4f2","BEEP BOOP"],
+["Ocean Internet","#1688b2","#9af1f0","DEEP MEMES"],
+["Cloud Kingdom","#a6d8ff","#ffffff","CLOUD NINE"],
+["Jelly World","#61c8c5","#d1fff3","VERY JIGGLY"],
+["Toy Box","#ed9d55","#fff0b5","PLAYTIME"],
+["Neon City","#182451","#54f3ed","NEON SPEED"],
+["Mushroom Forest","#72a966","#f0d1ff","MUSHROOM POWER"],
+["Moon Base","#53628c","#e1eaff","ONE SMALL HOP"],
+["Watermelon World","#59b76e","#ffaaaa","JUICY MEMES"],
+["Giant Arcade","#302d6a","#ff83ce","INSERT COIN"],
+["Crystal Cave","#51408c","#b9f7ff","SHINY STUFF"],
+["Snow Day","#b8e7ff","#ffffff","SNOW WAY"],
+["Supermarket","#e4b65e","#fff0aa","SHOPPING TIME"],
+["Pirate Island","#258c9c","#ffe0a0","AHOY RABBITS"],
+["Farm Frenzy","#8ccf71","#fff0ae","FARM FRENZY"],
+["Skate Park","#f49d55","#c8f5ff","RADICAL RABBITS"],
+["Music Planet","#503f93","#ffa7df","DROP THE BEAT"],
+["Lemon Galaxy","#293d8a","#fff17a","SOUR POWER"],
+["Dinosaur Valley","#75ae61","#ffd18d","DINO MAYHEM"],
+["Gummy Galaxy","#5544a8","#ffb6e6","GUMMY TIME"],
+["Space Carnival","#403b91","#ffd166","STEP RIGHT UP"],
+["Mountain Meme","#7394a9","#f0f7ff","PEAK PERFORMANCE"],
+["Flower Planet","#73bf82","#ffc9ec","FLOWER POWER"],
+["Cyber Forest","#1b6359","#76ffe0","CYBER HOP"],
+["Dream Dimension","#8075ca","#ffddfb","DREAM BIG"],
+["Golden Meme Land","#d6a62e","#fff1a1","GOLDEN BUNNY"],
+["Volleyball Beach","#63c9ed","#fff3b2","BEACH BALL"],
+["Superhero City","#526fc1","#f9d36b","HERO HOP"],
+["Rainbow Valley","#7dcfce","#ffc5e9","COLOR CHAOS"],
+["Chocolate Planet","#91654e","#f8d7a1","CHOCOLATE TIME"],
+["Sports Stadium","#5ba86c","#f7e5a0","GAME ON"],
+["Space Garden","#5262b4","#c8ffc7","GROW BIG"],
+["Toy Robot World","#69a8c9","#f5b9d6","ROBOT RALLY"],
+["Golden Carrot Kingdom","#d6a62e","#fff1a1","GOLDEN BUNNY"],
+["Final Meme Arena","#37306a","#ffd166","ULTIMATE MAYHEM"]
+];
+
+let level=1,shots=5,score=0,aimOn=true;
+let rabbit=null,blocks=[],targets=[],particles=[];
+let dragging=false,won=false,gameOver=false,lastTime=0;
+let dragOffsetX=0,dragOffsetY=0;
+
+const rand=(a,b)=>a+Math.random()*(b-a);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const ui=id=>document.getElementById(id);
+
+function makeRabbit(){
+ rabbit={
+  x:sling.x,y:sling.y,r:17,
+  vx:0,vy:0,alive:true,launched:false,age:0
+ };
+}
+
+function addBlock(x,y,w,h,kind="wood"){
+ blocks.push({
+  x,y,w,h,kind,
+  vx:0,vy:0,angle:0,spin:0
+ });
+}
+
+function buildLevel(n){
+ level=clamp(n,1,50);
+ shots=5;
+ won=false;
+ gameOver=false;
+ dragging=false;
+ blocks=[];
+ targets=[];
+ particles=[];
+ makeRabbit();
+
+ // Every level gets a simple tower layout.
+ const towerCount=Math.min(2+Math.floor((level-1)/7),5);
+ const startX=535;
+
+ for(let t=0;t<towerCount;t++){
+  const x=startX+t*88;
+  const height=2+((level+t)%3);
+
+  for(let row=0;row<height;row++){
+   addBlock(x,GROUND-30-row*32,62,28,"wood");
+  }
+
+  if(height>=3){
+   addBlock(x+8,GROUND-30-height*32,46,22,"carrot");
+  }
+ }
+
+ // Targets are placed around the towers.
+ const targetCount=Math.min(1+Math.floor((level-1)/4),5);
+ for(let i=0;i<targetCount;i++){
+  targets.push({
+   x:590+i*65,
+   y:GROUND-48-(i%2)*60,
+   r:14,
+   alive:true
+  });
+ }
+
+ updateUI();
+ ui("message").textContent=
+  "Pull the rabbit backward and release. Aim for the targets and towers!";
+}
+
+function updateUI(){
+ ui("levelLabel").textContent=`Level ${level} / 50`;
+ ui("tries").textContent=`Tries: ${shots} / 5`;
+ ui("score").textContent=`Score: ${score}`;
+}
+
+// Convert mouse or touch position to canvas coordinates.
+function pointerPos(e){
+ const r=canvas.getBoundingClientRect();
+ return {
+  x:(e.clientX-r.left)*W/r.width,
+  y:(e.clientY-r.top)*H/r.height
+ };
+}
+
+// Easy mouse and touchscreen controls.
+canvas.addEventListener("pointerdown",e=>{
+ if(won||gameOver||!rabbit||!rabbit.alive||
+    rabbit.launched||shots<=0)return;
+
+ const p=pointerPos(e);
+ if(Math.hypot(p.x-rabbit.x,p.y-rabbit.y)<55){
+  dragging=true;
+  dragOffsetX=p.x-rabbit.x;
+  dragOffsetY=p.y-rabbit.y;
+  canvas.setPointerCapture(e.pointerId);
+  e.preventDefault();
+ }
+});
+
+canvas.addEventListener("pointermove",e=>{
+ if(!dragging||!rabbit)return;
+ const p=pointerPos(e);
+
+ // Pull the bunny backward. The large range makes aiming easier.
+ rabbit.x=clamp(p.x-dragOffsetX,sling.x-125,sling.x+5);
+ rabbit.y=clamp(p.y-dragOffsetY,sling.y-110,sling.y+110);
+ e.preventDefault();
+});
+
+function launchRabbit(){
+ if(!dragging||!rabbit)return;
+ dragging=false;
+
+ const dx=sling.x-rabbit.x;
+ const dy=sling.y-rabbit.y;
+ const distance=Math.hypot(dx,dy);
+
+ if(distance<4){
+  makeRabbit();
+  return;
+ }
+
+ // Strong, predictable launch. More pull = more speed.
+ const power=10.5;
+ rabbit.vx=dx*power;
+ rabbit.vy=dy*power;
+ rabbit.launched=true;
+ rabbit.age=0;
+ shots--;
+
+ updateUI();
+ ui("message").textContent="FLY, BUNNY, FLY!";
+}
+
+canvas.addEventListener("pointerup",launchRabbit);
+canvas.addEventListener("pointercancel",launchRabbit);
+
+ui("reset").onclick=()=>buildLevel(level);
+ui("next").onclick=()=>buildLevel(level===50?1:level+1);
+ui("aimButton").onclick=()=>{
+ aimOn=!aimOn;
+ ui("aimButton").textContent=`🎯 Aim Guide: ${aimOn?"ON":"OFF"}`;
+};
+
+function burst(x,y,color){
+ for(let i=0;i<9;i++){
+  particles.push({
+   x,y,vx:rand(-130,130),vy:rand(-170,25),
+   life:rand(.3,.65),color
+  });
+ }
+}
+
+function circleBlockHit(c,b){
+ const x=clamp(c.x,b.x,b.x+b.w);
+ const y=clamp(c.y,b.y,b.y+b.h);
+ const dx=c.x-x,dy=c.y-y;
+ return dx*dx+dy*dy<c.r*c.r;
+}
+
+function hitBlock(b){
+ const px=clamp(rabbit.x,b.x,b.x+b.w);
+ const py=clamp(rabbit.y,b.y,b.y+b.h);
+
+ let dx=rabbit.x-px;
+ let dy=rabbit.y-py;
+ let d=Math.hypot(dx,dy);
+
+ if(d<.01){
+  dx=0;
+  dy=-1;
+  d=1;
+ }
+
+ dx/=d;
+ dy/=d;
+
+ const speed=Math.hypot(rabbit.vx,rabbit.vy);
+
+ // Bounce the rabbit away from the block.
+ rabbit.vx=dx*Math.max(100,speed*.42);
+ rabbit.vy=dy*Math.max(100,speed*.42);
+
+ // Transfer the hit into the tower so it can topple.
+ b.vx+=dx*speed*.7;
+ b.vy+=dy*speed*.25-35;
+ b.spin+=clamp((rabbit.x-(b.x+b.w/2))/b.w,-1,1)*speed*.012;
+
+ // Separate rabbit from the block to avoid sticking.
+ rabbit.x+=dx*4;
+ rabbit.y+=dy*4;
+
+ burst(px,py,"#ffe2a8");
+}
+
+function update(dt){
+ dt=Math.min(dt,.025);
+
+ if(rabbit&&rabbit.alive&&rabbit.launched&&!won&&!gameOver){
+  rabbit.age+=dt;
+  rabbit.vy+=GRAVITY*dt;
+  rabbit.x+=rabbit.vx*dt;
+  rabbit.y+=rabbit.vy*dt;
+
+  // Towers stop the rabbit and receive the impact.
+  for(const b of blocks){
+   if(circleBlockHit(rabbit,b)){
+    hitBlock(b);
+   }
+  }
+
+  // Ground collision.
+  if(rabbit.y+rabbit.r>GROUND){
+   rabbit.y=GROUND-rabbit.r;
+
+   if(Math.abs(rabbit.vy)>95){
+    rabbit.vy=-Math.abs(rabbit.vy)*.18;
+    rabbit.vx*=.76;
+   }else{
+    rabbit.vy=0;
+    rabbit.vx*=Math.pow(.025,dt);
+   }
+  }
+
+  // Collect targets by touching them.
+  for(const t of targets){
+   if(t.alive&&Math.hypot(rabbit.x-t.x,rabbit.y-t.y)<rabbit.r+t.r){
+    t.alive=false;
+    score+=100;
+    burst(t.x,t.y,"#fff06a");
+    updateUI();
+   }
+  }
+
+  const resting=
+   rabbit.y+rabbit.r>=GROUND-1&&
+   Math.abs(rabbit.vx)<30&&
+   Math.abs(rabbit.vy)<25&&
+   rabbit.age>.45;
+
+  const out=
+   rabbit.x>W+60||rabbit.x<-60||
+   rabbit.y>H+80||rabbit.age>8;
+
+  if(resting||out){
+   rabbit.alive=false;
+
+   if(targets.every(t=>!t.alive)){
+    won=true;
+    ui("message").textContent=
+     `Level ${level} cleared! Press Next Level to continue!`;
+   }else if(shots>0){
+    makeRabbit();
+    ui("message").textContent=
+     "New rabbit ready! You still have tries left.";
+   }else{
+    gameOver=true;
+    ui("message").textContent=
+     "Out of tries! Press Restart Level to try again.";
+   }
+  }
+ }
+
+ // Gravity and ground collision for every tower block.
+ for(const b of blocks){
+  b.vy+=GRAVITY*dt;
+  b.x+=b.vx*dt;
+  b.y+=b.vy*dt;
+  b.angle+=b.spin*dt;
+
+  const bw=Math.abs(Math.cos(b.angle))*b.w+
+           Math.abs(Math.sin(b.angle))*b.h;
+  const bh=Math.abs(Math.sin(b.angle))*b.w+
+           Math.abs(Math.cos(b.angle))*b.h;
+
+  if(b.y+bh>GROUND){
+   b.y=GROUND-bh;
+
+   if(Math.abs(b.vy)>65){
+    b.vy=-Math.abs(b.vy)*.12;
+    b.vx*=.82;
+    b.spin*=.7;
+   }else{
+    b.vy=0;
+    b.vx*=Math.pow(.05,dt);
+    b.spin*=Math.pow(.04,dt);
+   }
+  }
+
+  if(b.x<0){
+   b.x=0;
+   b.vx=Math.abs(b.vx)*.2;
+  }
+
+  if(b.x+bw>W){
+   b.x=W-bw;
+   b.vx=-Math.abs(b.vx)*.2;
+  }
+ }
+
+ // Block-to-block collisions help the towers fall over.
+ for(let pass=0;pass<2;pass++){
+  for(let i=0;i<blocks.length;i++){
+   const a=blocks[i];
+   const aw=Math.abs(Math.cos(a.angle))*a.w+
+            Math.abs(Math.sin(a.angle))*a.h;
+   const ah=Math.abs(Math.sin(a.angle))*a.w+
+            Math.abs(Math.cos(a.angle))*a.h;
+
+   for(let j=i+1;j<blocks.length;j++){
+    const b=blocks[j];
+    const bw=Math.abs(Math.cos(b.angle))*b.w+
+             Math.abs(Math.sin(b.angle))*b.h;
+    const bh=Math.abs(Math.sin(b.angle))*b.w+
+             Math.abs(Math.cos(b.angle))*b.h;
+
+    const ox=(aw+bw)/2-
+      Math.abs((a.x+aw/2)-(b.x+bw/2));
+    const oy=(ah+bh)/2-
+      Math.abs((a.y+ah/2)-(b.y+bh/2));
+
+    if(ox>0&&oy>0){
+     if(oy<ox){
+      const dir=(a.y+ah/2)<(b.y+bh/2)?-1:1;
+      a.y+=dir*oy*.51;
+      b.y-=dir*oy*.51;
+
+      const v=(a.vy-b.vy)*.18;
+      a.vy-=v;
+      b.vy+=v;
+      a.vx+=(a.x-b.x)*.7;
+      b.vx-=(a.x-b.x)*.7;
+     }else{
+      const dir=(a.x+aw/2)<(b.x+bw/2)?-1:1;
+      a.x+=dir*ox*.51;
+      b.x-=dir*ox*.51;
+
+      const v=(a.vx-b.vx)*.25;
+      a.vx-=v;
+      b.vx+=v;
+      a.spin+=dir*.3;
+      b.spin-=dir*.3;
+     }
+    }
+   }
+  }
+ }
+
+ particles=particles.filter(p=>p.life>0);
+ for(const p of particles){
+  p.life-=dt;
+  p.x+=p.vx*dt;
+  p.y+=p.vy*dt;
+  p.vy+=GRAVITY*.4*dt;
+ }
+}
+
+function drawBackground(){
+ const t=themes[level-1];
+ const g=ctx.createLinearGradient(0,0,0,H);
+ g.addColorStop(0,t[1]);
+ g.addColorStop(1,t[2]);
+ ctx.fillStyle=g;
+ ctx.fillRect(0,0,W,H);
+
+ for(let i=0;i<35;i++){
+  ctx.fillStyle="rgba(255,255,255,.3)";
+  ctx.beginPath();
+  ctx.arc((i*173+31)%W,(i*79+23)%390,2+i%3,0,Math.PI*2);
+  ctx.fill();
+ }
+
+ ctx.fillStyle="rgba(255,255,255,.9)";
+ ctx.font="bold 28px Arial";
+ ctx.fillText(t[0],25,40);
+ ctx.font="bold 17px Arial";
+ ctx.fillText(t[3],26,65);
+
+ ctx.fillStyle="#5aaf50";
+ ctx.fillRect(0,GROUND,W,H-GROUND);
+ ctx.fillStyle="#327a39";
+ ctx.fillRect(0,GROUND,W,9);
+}
+
+function drawSling(){
+ ctx.strokeStyle="#713f12";
+ ctx.lineWidth=10;
+ ctx.lineCap="round";
+
+ ctx.beginPath();
+ ctx.moveTo(sling.x-10,GROUND);
+ ctx.lineTo(sling.x-5,sling.y-15);
+ ctx.moveTo(sling.x+12,GROUND);
+ ctx.lineTo(sling.x+5,sling.y-15);
+ ctx.stroke();
+
+ ctx.strokeStyle="#9a3412";
+ ctx.lineWidth=4;
+ ctx.beginPath();
+ ctx.moveTo(sling.x-5,sling.y-15);
+
+ if(rabbit&&rabbit.alive&&!rabbit.launched){
+  ctx.lineTo(rabbit.x,rabbit.y);
+ }else{
+  ctx.lineTo(sling.x,sling.y);
+ }
+
+ ctx.lineTo(sling.x+5,sling.y-15);
+ ctx.stroke();
+}
+
+function drawRabbit(){
+ if(!rabbit||!rabbit.alive)return;
+
+ ctx.save();
+ ctx.translate(rabbit.x,rabbit.y);
+
+ if(rabbit.launched){
+  ctx.rotate(Math.atan2(rabbit.vy,rabbit.vx)*.22);
+ }
+
+ ctx.fillStyle="#fff";
+ ctx.beginPath();
+ ctx.ellipse(-7,-22,6,15,-.25,0,Math.PI*2);
+ ctx.ellipse(7,-23,6,15,.25,0,Math.PI*2);
+ ctx.fill();
+
+ ctx.fillStyle="#f9a8d4";
+ ctx.beginPath();
+ ctx.ellipse(-7,-22,2.5,10,-.25,0,Math.PI*2);
+ ctx.ellipse(7,-23,2.5,10,.25,0,Math.PI*2);
+ ctx.fill();
+
+ ctx.fillStyle="white";
+ ctx.beginPath();
+ ctx.arc(0,0,17,0,Math.PI*2);
+ ctx.fill();
+
+ ctx.fillStyle="#111827";
+ ctx.beginPath();
+ ctx.arc(6,-4,2.3,0,Math.PI*2);
+ ctx.fill();
+
+ ctx.fillStyle="#fb7185";
+ ctx.beginPath();
+ ctx.arc(11,3,3,0,Math.PI*2);
+ ctx.fill();
+
+ ctx.restore();
+}
+
+function drawBlocks(){
+ for(const b of blocks){
+  ctx.save();
+  ctx.translate(b.x+b.w/2,b.y+b.h/2);
+  ctx.rotate(b.angle);
+
+  if(b.kind==="carrot"){
+   ctx.fillStyle="#f97316";
+   ctx.strokeStyle="#9a3412";
+  }else{
+   ctx.fillStyle="#b77942";
+   ctx.strokeStyle="#704214";
+  }
+
+  ctx.lineWidth=3;
+  ctx.fillRect(-b.w/2,-b.h/2,b.w,b.h);
+  ctx.strokeRect(-b.w/2,-b.h/2,b.w,b.h);
+
+  ctx.strokeStyle="rgba(255,255,255,.25)";
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(-b.w/2+5,0);
+  ctx.lineTo(b.w/2-5,0);
+  ctx.stroke();
+
+  ctx.restore();
+ }
+}
+
+function drawTargets(){
+ for(const t of targets){
+  if(!t.alive)continue;
+
+  ctx.save();
+  ctx.translate(t.x,t.y);
+
+  ctx.fillStyle="#374151";
+  ctx.beginPath();
+  ctx.ellipse(0,0,16,11,0,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(-8,0);
+  ctx.lineTo(-24,-10);
+  ctx.lineTo(-17,5);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(8,0);
+  ctx.lineTo(24,-10);
+  ctx.lineTo(17,5);
+  ctx.fill();
+
+  ctx.fillStyle="#fbbf24";
+  ctx.beginPath();
+  ctx.moveTo(12,-2);
+  ctx.lineTo(23,2);
+  ctx.lineTo(12,5);
+  ctx.fill();
+
+  ctx.fillStyle="white";
+  ctx.beginPath();
+  ctx.arc(7,-4,4,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle="#111827";
+  ctx.beginPath();
+  ctx.arc(8,-4,1.8,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+ }
+}
+
+function drawAim(){
+ if(!aimOn||!dragging||!rabbit)return;
+
+ const dx=sling.x-rabbit.x;
+ const dy=sling.y-rabbit.y;
+
+ ctx.fillStyle="rgba(255,255,255,.95)";
+
+ for(let i=1;i<=36;i++){
+  const t=i*.045;
+  const x=sling.x+dx*10.5*t;
+  const y=sling.y+dy*10.5*t+.5*GRAVITY*t*t;
+
+  if(y>GROUND)break;
+
+  ctx.beginPath();
+  ctx.arc(x,y,3,0,Math.PI*2);
+  ctx.fill();
+ }
+}
+
+function draw(){
+ drawBackground();
+ drawSling();
+ drawBlocks();
+ drawTargets();
+ drawAim();
+ drawRabbit();
+
+ for(const p of particles){
+  ctx.globalAlpha=Math.max(0,p.life*2);
+  ctx.fillStyle=p.color;
+  ctx.beginPath();
+  ctx.arc(p.x,p.y,3,0,Math.PI*2);
+  ctx.fill();
+ }
+ ctx.globalAlpha=1;
+
+ if(won||gameOver){
+  ctx.fillStyle="rgba(15,23,42,.75)";
+  ctx.fillRect(0,0,W,H);
+
+  ctx.textAlign="center";
+  ctx.fillStyle="white";
+  ctx.font="bold 46px Arial";
+  ctx.fillText(won?"LEVEL CLEARED!":"OUT OF TRIES!",W/2,H/2-10);
+
+  ctx.font="22px Arial";
+  ctx.fillText(
+   won?"Press Next Level to continue":"Restart the level to try again",
+   W/2,H/2+32
+  );
+
+  ctx.textAlign="left";
+ }
+}
+
+function frame(time){
+ const dt=lastTime?Math.min((time-lastTime)/1000,.025):0;
+ lastTime=time;
+ update(dt);
+ draw();
+ requestAnimationFrame(frame);
+}
+
+buildLevel(1);
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
